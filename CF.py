@@ -6,7 +6,7 @@ import os
 os.system("cls")
 
 # Change filter variables
-iterations = 1
+iterations = 100
 sample_freq = 120
 weight = 0.95
 
@@ -82,12 +82,12 @@ for iterator in range(iterations):
         # If first run of monte carlo simulation
         if iterator == 0:
             pitch_squared_error.append((pitch_ground_truth[k] - pitches[k]) ** 2)
-            pitch_squared_error.append((roll_ground_truth[k] - rolls[k]) ** 2)
-            pitch_squared_error.append((yaw_ground_truth[k] - yaws[k]) ** 2)
+            roll_squared_error.append((roll_ground_truth[k] - rolls[k]) ** 2)
+            yaw_squared_error.append((yaw_ground_truth[k] - yaws[k]) ** 2)
         else:
             pitch_squared_error[k] += (pitch_ground_truth[k] - pitches[k]) ** 2
-            pitch_squared_error[k] += (roll_ground_truth[k] - rolls[k]) ** 2
-            pitch_squared_error[k] += (yaw_ground_truth[k] - yaws[k]) ** 2
+            roll_squared_error[k] += (roll_ground_truth[k] - rolls[k]) ** 2
+            yaw_squared_error[k] += (yaw_ground_truth[k] - yaws[k]) ** 2
 
 
     # Define x axis list for plotting
