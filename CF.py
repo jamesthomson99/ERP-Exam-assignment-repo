@@ -5,151 +5,104 @@ import os
 
 os.system("cls")
 
-# Choose whether to do monte carlo run
-do_monte_carlo = 0
+# Change filter variables
+iterations = 1
+sample_freq = 120
+weight = 0.95
 
-if do_monte_carlo:
-    iterations = 100
-else:
-    iterations = 1
+pitch_squared_error = []
+roll_squared_error = []
+yaw_squared_error = []
 
-se_pitch = []
-se_roll = []
-se_yaw = []
+ground_truth = np.load(r'Data\GT.npy')
+acc_data = np.load(r'Data\accelData.npy')
+gyr_data = np.load(r'Data\gyroData.npy')
+mag_data = np.load(r'Data\magData.npy')
 
+pitch_ground_truth, roll_ground_truth, yaw_ground_truth = [], [], []
 
-def read_sensor_data_csv():
-    csv_file = open('sensor_readings.csv', 'r')
-    col_1 = []
-    col_2 = []
-    col_3 = []
-    col_4 = []
-    col_5 = []
-    col_6 = []
-    col_7 = []
-    col_8 = []
-    col_9 = []
-
-    # Read off and discard first line, to skip headers
-    csv_file.readline()
-
-    # Split columns while reading
-    for item1, item2, item3, item4, item5, item6, item7, item8, item9, item10 in csv.reader(csv_file, delimiter=','):
-        # Append each variable to a separate list
-
-        col_1.append(float(item2) + np.random.normal(0, 0.01))
-        col_2.append(float(item3) + np.random.normal(0, 0.01))
-        col_3.append(float(item4) + np.random.normal(0, 0.01))
-        col_4.append(float(item5) + np.random.normal(0, 0.01))
-        col_5.append(float(item6) + np.random.normal(0, 0.01))
-        col_6.append(float(item7) + np.random.normal(0, 0.01))
-        col_7.append(float(item8) + np.random.normal(0, 0.01))
-        col_8.append(float(item9) + np.random.normal(0, 0.01))
-        col_9.append(float(item10) + np.random.normal(0, 0.01))
-
-    return col_1, col_2, col_3, col_4, col_5, col_6, col_7, col_8, col_9
-
-
-def read_ground_truth_csv():
-    csv_file = open('angles.csv', 'r')
-
-    col_1 = []
-    col_2 = []
-    col_3 = []
-    col_4 = []
-
-    # Read off and discard first line, to skip headers
-    csv_file.readline()
-
-    # Split columns while reading
-    for item1, item2, item3, item4, item5, item6, item7 in csv.reader(csv_file, delimiter=','):
-        # Append each variable to a separate list
-        col_1.append(float(item1))
-        col_2.append(float(item2) * 180/np.pi)
-        col_3.append(float(item3) * 180/np.pi)
-        col_4.append(float(item4) * 180/np.pi)
-
-    return col_2, col_3, col_4
+for i in range(len(ground_truth)):
+    roll_ground_truth.append(ground_truth[i][0])
+    pitch_ground_truth.append(ground_truth[i][1])
+    yaw_ground_truth.append(ground_truth[i][2])
 
 
 # Runs once if do_monte_carlo == 0 and runs *iterations* number of times if do_monte_carlo == 1
 for iterator in range(iterations):
-
-    # Read sensor data from csv
-    gyr_x, gyr_y, gyr_z, acc_x, acc_y, acc_z, mag_x, mag_y, mag_z = read_sensor_data_csv()
-    pitch_gt, roll_gt, yaw_gt = read_ground_truth_csv()
+    acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z, mag_x, mag_y, mag_z = [], [], [], [], [], [], [], [], []
+    
+    for j in range(len(acc_data[0])):
+        acc_x.append(acc_data[iterator][j][0])
+        acc_y.append(acc_data[iterator][j][1])
+        acc_z.append(acc_data[iterator][j][2])
+        gyr_x.append(gyr_data[iterator][j][0])
+        gyr_y.append(gyr_data[iterator][j][1])
+        gyr_z.append(gyr_data[iterator][j][2])
+        mag_x.append(mag_data[iterator][j][0])
+        mag_y.append(mag_data[iterator][j][1])
+        mag_z.append(mag_data[iterator][j][2])
 
     data_len = len(gyr_x)
-    sample_freq = 100
     delta_t = 1/sample_freq
-    weight = 0.98
 
-    pitch = 0
-    roll = 0
-    yaw = 0
+    pitch, roll, yaw = 0, 0, 0
+    pitches, rolls, yaws = [], [], []
 
-    pitch_list = []
-    roll_list = []
-    yaw_list = []
+    for k in range(data_len):
+        wx = gyr_x[k]
+        wy = gyr_y[k]
+        wz = gyr_z[k]
+        ax = acc_x[k]
+        ay = acc_y[k]
+        az = acc_z[k]
+        mx = mag_x[k]
+        my = mag_y[k]
+        mz = mag_z[k]
 
-    for i in range(data_len):
-        wx = gyr_x[i]
-        wy = gyr_y[i]
-        wz = gyr_z[i]
-        ax = acc_x[i]
-        ay = acc_y[i]
-        az = acc_z[i]
-        mx = mag_x[i]
-        my = mag_y[i]
-        mz = mag_z[i]
-
-        # print("Measurements: ", wx, ", ", wy, ", ", wz, ", ", ax, ", ", ay, ", ", az, ", ", mx, ", ", my, ", ", mz)
-
-        a_pitch = np.arctan2(-ax, np.sqrt(ay**2 + az**2)) * (180 / np.pi)
-        a_roll = np.arctan2(ay, az) * (180 / np.pi)
+        a_pitch = np.arctan2(-ax, np.sqrt(ay**2 + az**2))
+        a_roll = np.arctan2(ay, az)
 
         Mx = mx * np.cos(a_pitch) + mz * np.sin(a_pitch)
         My = mx * np.sin(a_roll) * np.sin(a_pitch) + my * np.cos(a_roll) - mz * np.sin(a_roll) * np.cos(a_pitch)
-        m_yaw = np.arctan2(-My, Mx) * (180 / np.pi)
+        m_yaw = np.arctan2(-My, Mx)
 
         g_pitch = wy * delta_t * (180 / np.pi)
         g_roll = wx * delta_t * (180 / np.pi)
         g_yaw = wz * delta_t * (180 / np.pi)
 
-        pitch = weight * (pitch + g_pitch * delta_t) + (1 - weight) * a_pitch
-        roll = weight * (roll + g_roll * delta_t) + (1 - weight) * a_roll
-        yaw = weight * (yaw + g_yaw * delta_t) + (1 - weight) * m_yaw
+        pitch = weight * (pitch + g_pitch * delta_t) + (1 - weight) * a_pitch  * (180 / np.pi)
+        roll = weight * (roll + g_roll * delta_t) + (1 - weight) * a_roll  * (180 / np.pi)
+        yaw = weight * (yaw + g_yaw * delta_t) + (1 - weight) * m_yaw  * (180 / np.pi)
 
-        # print("Angles: ", pitch, ", ", roll, ", ", yaw)
-
-        pitch_list.append(-pitch)
-        roll_list.append(-roll)
-        yaw_list.append(-yaw)
+        pitches.append(pitch)
+        rolls.append(roll)
+        yaws.append(yaw)
 
         # Calculate square error
         # If first run of monte carlo simulation
         if iterator == 0:
-            se_pitch.append((pitch_gt[i] - pitch_list[i]) ** 2)
-            se_roll.append((roll_gt[i] - roll_list[i]) ** 2)
-            se_yaw.append((yaw_gt[i] - yaw_list[i]) ** 2)
+            pitch_squared_error.append((pitch_ground_truth[k] - pitches[k]) ** 2)
+            pitch_squared_error.append((roll_ground_truth[k] - rolls[k]) ** 2)
+            pitch_squared_error.append((yaw_ground_truth[k] - yaws[k]) ** 2)
         else:
-            se_pitch[i] += (pitch_gt[i] - pitch_list[i]) ** 2
-            se_roll[i] += (roll_gt[i] - roll_list[i]) ** 2
-            se_yaw[i] += (yaw_gt[i] - yaw_list[i]) ** 2
+            pitch_squared_error[k] += (pitch_ground_truth[k] - pitches[k]) ** 2
+            pitch_squared_error[k] += (roll_ground_truth[k] - rolls[k]) ** 2
+            pitch_squared_error[k] += (yaw_ground_truth[k] - yaws[k]) ** 2
+
 
     # Define x axis list for plotting
     x = np.arange(0, data_len * delta_t, delta_t)
 
     # Only plot graphs if only 1 iteration is occurring, otherwise too many graphs are plotted
-    if not do_monte_carlo:
+    if iterations == 1:
         fig, axs = plt.subplots(3)
         fig.suptitle("Complementary filter")
-        axs[0].plot(x, pitch_list, 'tab:blue', label="Pitch")
-        axs[0].plot(x, pitch_gt, 'tab:blue', label="True", linestyle='dotted')
-        axs[1].plot(x, roll_list, 'tab:green', label="Roll")
-        axs[1].plot(x, roll_gt, 'tab:green', label="True", linestyle='dotted')
-        axs[2].plot(x, yaw_list, 'tab:red', label="Yaw")
-        axs[2].plot(x, yaw_gt, 'tab:red', label="True", linestyle='dotted')
+        axs[0].plot(x, pitches, 'tab:orange', label="Pitch")
+        axs[0].plot(x, pitch_ground_truth, 'tab:orange', label="True", linestyle='dotted')
+        axs[1].plot(x, rolls, 'tab:blue', label="Roll")
+        axs[1].plot(x, roll_ground_truth, 'tab:blue', label="True", linestyle='dotted')
+        axs[2].plot(x, yaws, 'tab:green', label="Yaw")
+        axs[2].plot(x, yaw_ground_truth, 'tab:green', label="True", linestyle='dotted')
         axs[2].set(xlabel="Time (s)")
         for ax in axs.flat:
             ax.set(ylabel="Angle (deg.)")
@@ -159,20 +112,18 @@ for iterator in range(iterations):
         plt.show()
 
 # Calculate RMSE and plot RMSE for Monte Carlo simulation now that all runs are complete
-if do_monte_carlo:
+if iterations > 1:
 
-    rmse_pitch = []
-    rmse_roll = []
-    rmse_yaw = []
+    pitch_rmse, roll_rmse, yaw_rmse = [], [], []
 
-    for j in range(len(se_pitch)):
-        rmse_pitch.append(np.sqrt(se_pitch[j]/iterations))
-        rmse_roll.append(np.sqrt(se_roll[j]/iterations))
-        rmse_yaw.append(np.sqrt(se_yaw)[j]/iterations)
+    for l in range(len(pitch_squared_error)):
+        pitch_rmse.append(np.sqrt(pitch_squared_error[l]/iterations))
+        roll_rmse.append(np.sqrt(roll_squared_error[l]/iterations))
+        yaw_rmse.append(np.sqrt(yaw_squared_error[l]/iterations))
 
-    plt.plot(x, rmse_pitch, color="blue", label="Pitch")
-    plt.plot(x, rmse_roll, color="green", label="Roll")
-    plt.plot(x, rmse_yaw, color="red", label="Yaw")
+    plt.plot(x, pitch_rmse, color="orange", label="Pitch")
+    plt.plot(x, roll_rmse, color="blue", label="Roll")
+    plt.plot(x, yaw_rmse, color="green", label="Yaw")
     plt.title("Root-mean-square error")
     plt.xlabel("Time (s)")
     plt.ylabel("Angle (deg.)")
