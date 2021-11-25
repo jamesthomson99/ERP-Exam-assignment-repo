@@ -7,7 +7,7 @@ import os
 os.system("cls")
 
 # Change filter variables
-iterations = 1
+iterations = 100
 sample_freq = 120
 weight = 0.95
 
@@ -30,7 +30,7 @@ for i in range(len(ground_truth)):
     yaw_ground_truth.append(ground_truth[i][2])
 
 
-# Runs once if do_monte_carlo == 0 and runs *iterations* number of times if do_monte_carlo == 1
+# Runs *iterations* number of times (either 1 for normal or 100 for Monte Carlo)
 for iterator in range(iterations):
     acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z, mag_x, mag_y, mag_z = [], [], [], [], [], [], [], [], []
     
