@@ -7,17 +7,21 @@ import csv
 # Change filter variables
 iterations = 1
 sample_rate = 120
-delta_t = 1/sample_rate
+delta_t = 1 / sample_rate
 
-sigma_w = 0.0733467
-sigma_a = 0.79933
-sigma_m = 4.36753
-# sigma_w = 0.2655;
-# sigma_a = 0.0021;
-# sigma_m = 0.005;
+# Define standard deviations and variances
+sigma_w = 0.001
+sigma_a = 0.001
+sigma_m = 0.001
 vw = sigma_w ** 2
 va = sigma_a ** 2
 vm = sigma_m ** 2
+sigma_wx = 0.09371
+sigma_wy = 0.06343
+sigma_wz = 0.0629
+vwx = sigma_wx ** 2
+vwy = sigma_wy ** 2
+vwz = sigma_wz ** 2
 
 # Change plotting variables
 plot_type = 0 # 0 - euler, 1 - quaternions
@@ -25,8 +29,12 @@ plot_uncertainty = 0
 plot_uncertainty_zoomed = 0
 
 # Create gravity vector and magnetic field vector based on dip angle = -62.217 °
-g = np.array([[0], [0], [1]])
-r = np.array([[0.4661241594], [0], [-0.884719316]])
+gx = 0
+gy = 0
+gz = 1
+rx = 0
+ry = 0.4661241594
+rz = 0.884719316
 
 # Create square error lists for Monte Carlo runs
 pitch_squared_error, roll_squared_error, yaw_squared_error = [], [], []
@@ -34,7 +42,7 @@ pitch_squared_error, roll_squared_error, yaw_squared_error = [], [], []
 def convert_to_euler(q_input):
     rotation = Rotation.from_quat([q_input[1][0], q_input[2][0], q_input[3][0], q_input[0][0]])
     euler_angles = rotation.as_euler('xyz', degrees=True)
-    return euler_angles[0], euler_angles[1], euler_angles[2]
+    return euler_angles[0] * (180 / np.pi), euler_angles[1] * (180 / np.pi), euler_angles[2] * (180 / np.pi)
 
 
 # Convert ground truth data to quaternions 
@@ -44,12 +52,12 @@ def convert_gt_to_quaternion(theta, phi, psi):
     qw_gt_return, qx_gt_return, qy_gt_return, qz_gt_return = [], [], [], []
 
     for k in range(len(theta)):
-        cos_yaw = np.cos((psi[k]*np.pi/180) / 2)
-        cos_roll = np.cos((phi[k]*np.pi/180) / 2)
-        cos_pitch = np.cos((theta[k]*np.pi/180) / 2)
-        sin_yaw = np.sin((psi[k]*np.pi/180) / 2)
-        sin_roll = np.sin((phi[k]*np.pi/180) / 2)
-        sin_pitch = np.sin((theta[k]*np.pi/180) / 2)
+        cos_yaw = np.cos((psi[k] * np.pi / 180) / 2)
+        cos_roll = np.cos((phi[k] * np.pi / 180) / 2)
+        cos_pitch = np.cos((theta[k] * np.pi / 180) / 2)
+        sin_yaw = np.sin((psi[k] * np.pi / 180) / 2)
+        sin_roll = np.sin((phi[k] * np.pi / 180) / 2)
+        sin_pitch = np.sin((theta[k] * np.pi / 180) / 2)
 
         # Append ground truth quaternion values to their respective lists
         qw_gt_return.append(cos_roll * cos_pitch * cos_yaw + sin_roll * sin_pitch * sin_yaw)
@@ -88,12 +96,12 @@ def predict(q_prev, P_prev, w_curr):
 
     # Calculate Wt matrix to be used to calculate process noise covariance (Qt)
     W = (delta_t/2)*np.array([[-qx, -qy, -qz],
-                         [ qw, -qz,  qy],
-                         [ qz,  qw, -qx],
-                         [-qy,  qx,  qw]])
+                              [ qw, -qz,  qy],
+                              [ qz,  qw, -qx],
+                              [-qy,  qx,  qw]])
 
     # Calculate process noise covariance (Qt)
-    Q = (sigma_w ** 2) * (W @ W.T)
+    Q =  W @ Sigma_w @ W.T
 
     # Calculate predicted covariance (Pt)
     P_new = (F @ P_prev @ F.T) + Q
@@ -106,10 +114,6 @@ def correct(q_pred, P_pred, z):
 
     # Define variables for predicted quaternion states
     qw, qx, qy, qz = q_pred[0][0], q_pred[1][0], q_pred[2][0], q_pred[3][0]
-
-    # Define variables for gravity components and magnetic field components
-    gx, gy, gz = g[0][0], g[1][0], g[2][0]
-    rx, ry, rz = r[0][0], r[1][0], r[2][0]
 
     # Create measurement model h(qt)
     h = 2 * np.array([[gx*(0.5 - qy**2 - qz**2) + gy*(qw*qz + qx*qy) + gz*(qx*qz - qw*qy)],
@@ -218,6 +222,11 @@ for iterator in range(iterations):
                   [0, 0, 0, 0, vm, 0],
                   [0, 0, 0, 0, 0, vm]])
 
+    # Create Sigma_w matrix to calculate Qt
+    Sigma_w = np.array([[vwx, 0, 0],
+                        [0, vwy, 0],
+                        [0, 0, vwz]])  
+
     # Loop through all sensor input data
     for i in range(len(gyr_x)):
 
@@ -248,7 +257,7 @@ for iterator in range(iterations):
         qw_list.append(q[0][0])
         qx_list.append(q[1][0])
         qy_list.append(q[2][0])
-        qz_list.append(q[3][0])
+        qz_list.append(q[3][0]) 
 
         # Store quaternion variances for plotting
         qw_variances.append(abs(P_predicted[0][0]))
@@ -316,6 +325,7 @@ for iterator in range(iterations):
                 axs[1, 1].fill_between(x, np.subtract(qy_list, qy_variances), np.add(qy_list, qy_variances), color="orange", alpha=0.2)
                 axs[1, 0].fill_between(x, np.subtract(qz_list, qz_variances), np.add(qz_list, qz_variances), color="red", alpha=0.2)
             for axis in axs.flat:
+                axis.set_ylim(-1, 1.2)
                 if plot_uncertainty_zoomed:
                     axis.set_xlim(0, 2)
                 else:
@@ -330,9 +340,9 @@ if iterations > 1:
     pitch_rmse, roll_rmse, yaw_rmse = [], [], []
 
     for j in range(len(pitch_squared_error)):
-        pitch_rmse.append(np.sqrt(pitch_squared_error[j]/iterations))
-        roll_rmse.append(np.sqrt(roll_squared_error[j]/iterations))
-        yaw_rmse.append(np.sqrt(yaw_squared_error[j]/iterations))
+        pitch_rmse.append(np.sqrt(pitch_squared_error[j] / iterations))
+        roll_rmse.append(np.sqrt(roll_squared_error[j] / iterations))
+        yaw_rmse.append(np.sqrt(yaw_squared_error[j] / iterations))
 
     plt.plot(x, pitch_rmse, color="blue", label="Pitch")
     plt.plot(x, roll_rmse, color="green", label="Roll")
