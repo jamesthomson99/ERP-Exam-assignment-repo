@@ -7,7 +7,7 @@ import os
 os.system("cls")
 
 # Change filter variables
-iterations = 100
+iterations = 1
 sample_freq = 120
 weight = 0.95
 
@@ -67,7 +67,7 @@ for iterator in range(iterations):
         mz = mag_z[k]
 
         # Actual CF algorithm
-        
+
         # Calculate pitch, roll, due to accelerometer data
         a_pitch = np.arctan2(-ax, np.sqrt(ay**2 + az**2))
         a_roll = np.arctan2(ay, az)

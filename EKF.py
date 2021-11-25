@@ -4,104 +4,26 @@ from matplotlib import pyplot as plt
 from scipy.spatial.transform import Rotation
 import csv
 
-# Choose whether to do monte carlo run
-do_monte_carlo = 1
-
-if do_monte_carlo:
-    iterations = 10
-else:
-    iterations = 1
-
-# Choose between NED frame (0) and ENU frame (1)
-frame = 0
-
-# Choose between euler angles (0) and quaternions (1)
-plot_type = 1
-
-# Choose whether to plot uncertainty and whether to zoom in or not
-plot_uncertainty = 1
-plot_uncertainty_zoomed = 0
-
-# Magnetic dip angle
-dip = -62.217 * np.pi / 180
-
-# Create square error lists for Monte Carlo runs
-se_pitch = []
-se_roll = []
-se_yaw = []
-
-# Create gravity vector and magnetic field vector
-if frame:
-    g = np.array([[0], [0], [1]])
-    r = (1 / (np.sqrt((np.cos(dip)) ** 2 + (np.sin(dip)) ** 2))) * np.array([[0], [np.cos(dip)], [np.sin(dip)]])
-# NED
-else:
-    g = np.array([[0], [0], [-1]])
-    r = (1 / (np.sqrt((np.cos(dip)) ** 2 + (np.sin(dip)) ** 2))) * np.array([[np.cos(dip)], [0], [-np.sin(dip)]])
-
-# Set sample rate and calculate sample period, dt
-sample_rate = 100
+# Change filter variables
+iterations = 1
+sample_rate = 120
 dt = 1/sample_rate
 
-# Set standard deviation (sigma_w) Note. (sigma_w ** 2 = variance)
 sigma_w = 0.02
 sigma_a = 0.008
 sigma_m = 0.03
 
+# Change plotting variables
+plot_type = 1 # 0 - euler, 1 - quaternions
+plot_uncertainty = 1
+plot_uncertainty_zoomed = 0
 
-def read_sensor_data_csv():
-    csv_file = open('sensor_readings.csv', 'r')
-    col_1 = []
-    col_2 = []
-    col_3 = []
-    col_4 = []
-    col_5 = []
-    col_6 = []
-    col_7 = []
-    col_8 = []
-    col_9 = []
+# Create gravity vector and magnetic field vector based on dip angle = -62.217 °
+g = np.array([[0], [0], [1]])
+r = np.array([[0], [0.4661241594], [0.884719316]])
 
-    # Read off and discard first line, to skip headers
-    csv_file.readline()
-
-    # Split columns while reading
-    for item1, item2, item3, item4, item5, item6, item7, item8, item9, item10 in csv.reader(csv_file, delimiter=','):
-        # Append each variable to a separate list
-
-        col_1.append(float(item2) + np.random.normal(0, 0.02))
-        col_2.append(float(item3) + np.random.normal(0, 0.02))
-        col_3.append(float(item4) + np.random.normal(0, 0.02))
-        col_4.append(float(item5) + np.random.normal(0, 0.008))
-        col_5.append(float(item6) + np.random.normal(0, 0.008))
-        col_6.append(float(item7) + np.random.normal(0, 0.008))
-        col_7.append(float(item8) + np.random.normal(0, 0.03))
-        col_8.append(float(item9) + np.random.normal(0, 0.03))
-        col_9.append(float(item10) + np.random.normal(0, 0.03))
-
-    return col_1, col_2, col_3, col_4, col_5, col_6, col_7, col_8, col_9
-
-
-def read_ground_truth_csv():
-    csv_file = open('angles.csv', 'r')
-
-    col_1 = []
-    col_2 = []
-    col_3 = []
-    col_4 = []
-
-    # Read off and discard first line, to skip headers
-    csv_file.readline()
-
-    # Split columns while reading
-    for item1, item2, item3, item4, item5, item6, item7 in csv.reader(csv_file, delimiter=','):
-        # Append each variable to a separate list
-        col_1.append(float(item1))
-        col_2.append(float(item2) * 180/np.pi)
-        col_3.append(float(item3) * 180/np.pi)
-        col_4.append(float(item4) * 180/np.pi)
-
-    return col_2, col_3, col_4
-
+# Create square error lists for Monte Carlo runs
+se_pitch, se_roll, se_yaw = [], [], []
 
 def convert_to_euler(q_input):
     rotation = Rotation.from_quat([q_input[0][0], -q_input[3][0], -q_input[2][0], q_input[1][0]])
@@ -218,8 +140,21 @@ def correct(q_pred, P_pred, z):
 
     return q_corr, P_corr
 
+# Load sensor data from the npy files
+ground_truth = np.load(r'Data\GT.npy')
+acc_data = np.load(r'Data\accelData.npy')
+gyr_data = np.load(r'Data\gyroData.npy')
+mag_data = np.load(r'Data\magData.npy')
 
-# Runs once if do_monte_carlo == 0 and runs *iterations* number of times if do_monte_carlo == 1
+pitch_ground_truth, roll_ground_truth, yaw_ground_truth = [], [], []
+
+# Split ground truth data into pitch, roll, yaw components
+for i in range(len(ground_truth)):
+    roll_ground_truth.append(ground_truth[i][0])
+    pitch_ground_truth.append(ground_truth[i][1])
+    yaw_ground_truth.append(ground_truth[i][2])
+
+# Runs *iterations* number of times (either 1 for normal or 100 for Monte Carlo)
 for iterator in range(iterations):
 
     # Read sensor data from csv
