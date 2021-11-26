@@ -1,4 +1,5 @@
 import numpy as np
+import time
 from matplotlib import pyplot as plt
 import csv
 import os
@@ -32,6 +33,9 @@ for i in range(len(ground_truth)):
 
 # Runs *iterations* number of times (either 1 for normal or 100 for Monte Carlo)
 for iterator in range(iterations):
+
+    print(iterator)
+
     acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z, mag_x, mag_y, mag_z = [], [], [], [], [], [], [], [], []
     
     # Extract the current run's accelerometer, gyroscope and magnetometer data from the npy files
@@ -103,27 +107,29 @@ for iterator in range(iterations):
             roll_squared_error[k] += (roll_ground_truth[k] - rolls[k]) ** 2
             yaw_squared_error[k] += (yaw_ground_truth[k] - yaws[k]) ** 2
 
+    
 
-    # Define x axis list for plotting
-    x = np.arange(0, data_len * delta_t, delta_t)
+# Define x axis list for plotting
+x = np.arange(0, data_len * delta_t, delta_t)
 
-    # Only plot graphs if only 1 iteration is occurring, otherwise too many graphs are plotted
-    if iterations == 1:
-        fig, axs = plt.subplots(3)
-        fig.suptitle("Complementary filter orientation estimate")
-        axs[0].plot(x, pitches, 'tab:orange', label="Pitch")
-        axs[0].plot(x, pitch_ground_truth, 'tab:orange', label="True", linestyle='dotted')
-        axs[1].plot(x, rolls, 'tab:blue', label="Roll")
-        axs[1].plot(x, roll_ground_truth, 'tab:blue', label="True", linestyle='dotted')
-        axs[2].plot(x, yaws, 'tab:green', label="Yaw")
-        axs[2].plot(x, yaw_ground_truth, 'tab:green', label="True", linestyle='dotted')
-        axs[2].set(xlabel="Time (s)")
-        for ax in axs.flat:
-            ax.set(ylabel="Angle (°)")
-            ax.set_xlim(0, data_len*delta_t)
-            ax.grid()
-            ax.legend(loc=1)
-        plt.show()
+# Only plot graphs if only 1 iteration is occurring, otherwise too many graphs are plotted
+if iterations == 1:
+    fig, axs = plt.subplots(3)
+    fig.suptitle("CF orientation estimate for 1st set of data")
+    axs[0].plot(x, pitches, color='crimson', label="Pitch")
+    axs[0].plot(x, pitch_ground_truth, color='crimson', label="Ground Truth", linestyle='dotted')
+    axs[1].plot(x, rolls, color='deepskyblue', label="Roll")
+    axs[1].plot(x, roll_ground_truth, color='deepskyblue', label="Ground Truth", linestyle='dotted')
+    axs[2].plot(x, yaws, color='lawngreen', label="Yaw")
+    axs[2].plot(x, yaw_ground_truth, color='lawngreen', label="Ground Truth", linestyle='dotted')
+    for axis in axs.flat:
+        axis.set(ylabel="Angle (°)")
+        axis.set(xlabel="Time (s)")
+        axis.set_xlim(0, data_len*delta_t)
+        axis.grid()
+        axis.legend(loc="upper right")
+    plt.show()
+
 
 # Calculate RMSE and plot RMSE for Monte Carlo simulation now that all runs are complete
 if iterations > 1:
@@ -135,12 +141,16 @@ if iterations > 1:
         roll_rmse.append(np.sqrt(roll_squared_error[l]/iterations))
         yaw_rmse.append(np.sqrt(yaw_squared_error[l]/iterations))
 
-    plt.plot(x, pitch_rmse, color="orange", label="Pitch")
-    plt.plot(x, roll_rmse, color="blue", label="Roll")
-    plt.plot(x, yaw_rmse, color="green", label="Yaw")
-    plt.title("Complemetary filter RMSE of 100 Monte Carlo runs")
-    plt.xlabel("Time (s)")
-    plt.ylabel("Angle (°)")
-    plt.grid()
-    plt.legend()
+    fig, axs = plt.subplots(3)
+    fig.suptitle("Root-mean-square error of CF for 100 Monte Carlo Runs")
+    axs[0].plot(pitch_rmse, color="crimson", label="Pitch RMSE")
+    axs[1].plot(roll_rmse, color="deepskyblue", label="Roll RMSE")
+    axs[2].plot(yaw_rmse, color="lawngreen", label="Yaw RMSE")
+    for axis in axs.flat:
+        axis.set(ylabel="Angle (°)")
+        axis.set(xlabel="Samples")
+        axis.grid(linestyle='--')
+        axis.legend(loc="upper right")
     plt.show()
+
+
